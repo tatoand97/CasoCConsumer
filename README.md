@@ -1,6 +1,6 @@
-# Caso C Consumer API
+# CasoCConsumer API
 
-API ASP.NET Core .NET 8 para consumo puro del Caso C por HTTP.
+API ASP.NET Core .NET 8 para consumo HTTP puro del caso C.
 
 ## Que hace
 
@@ -35,10 +35,11 @@ CasoCConsumerOrchestrator
 ```
 
 La orquestacion sigue en el backend. El repo `CasoCConsumer` solo consume agentes externos ya preparados.
+El repo `CasoC` queda como bootstrap / IaC logico; este runtime no crea ni reconcilia agentes.
 
-## Prerequisite
+## Prerequisito
 
-El repo bootstrap de Caso C o el repo equivalente debe ejecutarse primero para asegurar que `PolicyAgent` y `PlannerAgent` ya existen en Foundry.
+El repo bootstrap `CasoC`, o un repo equivalente, debe ejecutarse primero para asegurar que los agentes ya existen en Foundry antes de levantar `CasoCConsumer`.
 
 Este repo asume que ya existen tres agentes accesibles:
 
@@ -64,7 +65,7 @@ Configura `appsettings.json` con referencias explicitas a tres agentes ya existe
 }
 ```
 
-`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por el repo bootstrap de Caso C o por un repo equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
+`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por el repo bootstrap `CasoC` o por un repo equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
 
 Claves requeridas:
 
