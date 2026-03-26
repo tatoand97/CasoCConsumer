@@ -70,23 +70,23 @@ internal sealed class CasoCOrchestrator
 
     private readonly ProjectOpenAIClient _openAiClient;
     private readonly AgentRunner _runner;
-    private readonly CasoCBootstrapState _bootstrapState;
+    private readonly CasoCAgentRegistry _agentRegistry;
 
     internal CasoCOrchestrator(
         ProjectOpenAIClient openAiClient,
         AgentRunner runner,
-        CasoCBootstrapState bootstrapState)
+        CasoCAgentRegistry agentRegistry)
     {
         _openAiClient = openAiClient;
         _runner = runner;
-        _bootstrapState = bootstrapState;
+        _agentRegistry = agentRegistry;
     }
 
     internal async Task<CasoCOrchestrationResult> RunAsync(
         string userRequest,
         CancellationToken cancellationToken)
     {
-        CasoCBootstrapSnapshot snapshot = _bootstrapState.GetRequiredSnapshot();
+        CasoCAgentSnapshot snapshot = _agentRegistry.GetRequiredSnapshot();
 
         string orderAgentResponse = await RunOrderAgentAsync(
             snapshot,
@@ -118,7 +118,7 @@ internal sealed class CasoCOrchestrator
     }
 
     private async Task<string> RunOrderAgentAsync(
-        CasoCBootstrapSnapshot snapshot,
+        CasoCAgentSnapshot snapshot,
         string userRequest,
         CancellationToken cancellationToken)
     {
@@ -164,7 +164,7 @@ internal sealed class CasoCOrchestrator
     }
 
     private async Task<string> RunPolicyAgentAsync(
-        CasoCBootstrapSnapshot snapshot,
+        CasoCAgentSnapshot snapshot,
         string validatedOrderJson,
         CancellationToken cancellationToken)
     {
@@ -200,7 +200,7 @@ internal sealed class CasoCOrchestrator
     }
 
     private async Task<string> RunPlannerAgentAsync(
-        CasoCBootstrapSnapshot snapshot,
+        CasoCAgentSnapshot snapshot,
         string userRequest,
         string validatedOrderJson,
         string validatedPolicyJson,

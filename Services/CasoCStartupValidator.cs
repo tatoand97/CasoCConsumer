@@ -6,31 +6,31 @@ using System.ClientModel;
 
 namespace CasoC.Services;
 
-internal sealed class CasoCBootstrapper
+internal sealed class CasoCStartupValidator
 {
     private readonly AIProjectClient _projectClient;
-    private readonly IOptions<CasoCSettings> _settingsOptions;
-    private readonly ILogger<CasoCBootstrapper> _logger;
+    private readonly CasoCSettings _settings;
+    private readonly ILogger<CasoCStartupValidator> _logger;
 
-    internal CasoCBootstrapper(
+    internal CasoCStartupValidator(
         AIProjectClient projectClient,
         IOptions<CasoCSettings> settingsOptions,
-        ILogger<CasoCBootstrapper> logger)
+        ILogger<CasoCStartupValidator> logger)
     {
         _projectClient = projectClient;
-        _settingsOptions = settingsOptions;
+        _settings = settingsOptions.Value;
         _logger = logger;
     }
 
-    internal async Task<CasoCBootstrapSnapshot> BootstrapAsync(CancellationToken cancellationToken)
+    internal async Task<CasoCAgentSnapshot> ValidateAsync(CancellationToken cancellationToken)
     {
-        CasoCSettings settings = _settingsOptions.Value;
         _logger.LogInformation("Bootstrap validation started.");
 
-        await ValidateIdentityCanAccessProjectAsync(_projectClient, cancellationToken);
+        await ValidateFoundryEndpointAsync(cancellationToken);
+        _logger.LogInformation("Foundry endpoint validated. Endpoint: {Endpoint}", _settings.AzureOpenAiEndpoint);
 
-        BootstrapAgentInfo orderAgent = await ValidateConfiguredAgentAsync(
-            settings.OrderAgentId!,
+        ValidatedAgentInfo orderAgent = await ValidateConfiguredAgentAsync(
+            _settings.OrderAgentId!,
             "Order",
             cancellationToken);
 
@@ -41,8 +41,8 @@ internal sealed class CasoCBootstrapper
             orderAgent.Version,
             orderAgent.ValidationStatus);
 
-        BootstrapAgentInfo policyAgent = await ValidateConfiguredAgentAsync(
-            settings.PolicyAgentId!,
+        ValidatedAgentInfo policyAgent = await ValidateConfiguredAgentAsync(
+            _settings.PolicyAgentId!,
             "Policy",
             cancellationToken);
 
@@ -53,8 +53,8 @@ internal sealed class CasoCBootstrapper
             policyAgent.Version,
             policyAgent.ValidationStatus);
 
-        BootstrapAgentInfo plannerAgent = await ValidateConfiguredAgentAsync(
-            settings.PlannerAgentId!,
+        ValidatedAgentInfo plannerAgent = await ValidateConfiguredAgentAsync(
+            _settings.PlannerAgentId!,
             "Planner",
             cancellationToken);
 
@@ -65,17 +65,17 @@ internal sealed class CasoCBootstrapper
             plannerAgent.Version,
             plannerAgent.ValidationStatus);
 
-        CasoCBootstrapSnapshot snapshot = new(
+        CasoCAgentSnapshot snapshot = new(
             orderAgent,
             policyAgent,
             plannerAgent,
-            TimeSpan.FromSeconds(settings.ResponsesTimeoutSeconds));
+            TimeSpan.FromSeconds(_settings.ResponsesTimeoutSeconds));
 
         _logger.LogInformation("Bootstrap validation completed.");
         return snapshot;
     }
 
-    private async Task<BootstrapAgentInfo> ValidateConfiguredAgentAsync(
+    private async Task<ValidatedAgentInfo> ValidateConfiguredAgentAsync(
         string configuredAgentId,
         string agentLabel,
         CancellationToken cancellationToken)
@@ -84,7 +84,7 @@ internal sealed class CasoCBootstrapper
         if (ConfiguredAgentReference.TryParse(configuredAgentId, out reference))
         {
             AgentVersion version = await GetAgentVersionAsync(reference!, agentLabel, cancellationToken);
-            return BootstrapAgentInfo.FromAgentVersion(version);
+            return ValidatedAgentInfo.FromAgentVersion(version);
         }
 
         AgentRecord agent = await GetAgentAsync(configuredAgentId, agentLabel, cancellationToken);
@@ -94,7 +94,7 @@ internal sealed class CasoCBootstrapper
             agentLabel,
             cancellationToken);
 
-        return BootstrapAgentInfo.FromAgentVersion(versionFromName);
+        return ValidatedAgentInfo.FromAgentVersion(versionFromName);
     }
 
     private async Task<AgentRecord> GetAgentAsync(
@@ -166,13 +166,20 @@ internal sealed class CasoCBootstrapper
             $"The configured {agentLabel}AgentId '{configuredAgentId}' resolved to agent '{agentName}', but no accessible versions were found.");
     }
 
-    private static async Task ValidateIdentityCanAccessProjectAsync(
-        AIProjectClient projectClient,
-        CancellationToken cancellationToken)
+    private async Task ValidateFoundryEndpointAsync(CancellationToken cancellationToken)
     {
-        await foreach (AgentRecord _ in projectClient.Agents.GetAgentsAsync(limit: 1, cancellationToken: cancellationToken))
+        try
         {
-            break;
+            await foreach (AgentRecord _ in _projectClient.Agents.GetAgentsAsync(limit: 1, cancellationToken: cancellationToken))
+            {
+                break;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException(
+                $"The configured AzureOpenAiEndpoint '{_settings.AzureOpenAiEndpoint}' is not accessible or is not a valid Foundry project endpoint.",
+                ex);
         }
     }
 

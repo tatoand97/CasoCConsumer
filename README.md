@@ -48,21 +48,23 @@ Este repo asume que ya existen tres agentes accesibles:
 
 ## Configuracion
 
-Configura `appsettings.json` con los tres agentes existentes:
+Configura `appsettings.json` con referencias explicitas a tres agentes ya existentes:
 
 ```json
 {
   "CasoC": {
     "AzureOpenAiEndpoint": "https://<resource>.services.ai.azure.com/api/projects/<project>",
-    "AzureOpenAiDeployment": "<deployment-name>",
-    "OrderAgentId": "OrderAgent:3",
-    "PolicyAgentId": "policy-agent-casec:2",
-    "PlannerAgentId": "planner-agent-casec-composer:1",
+    "AzureOpenAiDeployment": "<existing-deployment-name>",
+    "OrderAgentId": "<existing-order-agent-id-or-name:version>",
+    "PolicyAgentId": "<existing-policy-agent-id-or-name:version>",
+    "PlannerAgentId": "<existing-planner-agent-id-or-name:version>",
     "ResponsesTimeoutSeconds": 60,
     "ResponsesMaxBackoffSeconds": 8
   }
 }
 ```
+
+`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por `CasoC` o por el repo de bootstrap equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
 
 Claves requeridas:
 
@@ -83,7 +85,7 @@ Validaciones al arranque:
 - `ResponsesTimeoutSeconds` debe ser mayor que `0`.
 - `ResponsesMaxBackoffSeconds` debe ser mayor que `0`.
 
-## Bootstrap de la API
+## Validacion de arranque
 
 Al iniciar:
 

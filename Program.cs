@@ -56,10 +56,10 @@ builder.Services.AddSingleton(sp =>
     CasoCSettings settings = sp.GetRequiredService<IOptions<CasoCSettings>>().Value;
     return new AgentRunner(TimeSpan.FromSeconds(settings.ResponsesMaxBackoffSeconds));
 });
-builder.Services.AddSingleton<CasoCBootstrapState>();
-builder.Services.AddSingleton<CasoCBootstrapper>();
+builder.Services.AddSingleton<CasoCAgentRegistry>();
+builder.Services.AddSingleton<CasoCStartupValidator>();
 builder.Services.AddSingleton<CasoCOrchestrator>();
-builder.Services.AddHostedService<CasoCBootstrapHostedService>();
+builder.Services.AddHostedService<CasoCStartupValidationHostedService>();
 
 var app = builder.Build();
 
@@ -179,9 +179,9 @@ casoCApi.MapPost("/ask/debug", async (
     }
 });
 
-casoCApi.MapGet("/health", (CasoCBootstrapState bootstrapState) =>
+casoCApi.MapGet("/health", (CasoCAgentRegistry agentRegistry) =>
 {
-    CasoCBootstrapSnapshot snapshot = bootstrapState.GetRequiredSnapshot();
+    CasoCAgentSnapshot snapshot = agentRegistry.GetRequiredSnapshot();
 
     return Results.Ok(new HealthResponse(
         "ok",

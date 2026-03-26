@@ -1,16 +1,16 @@
 namespace CasoC.Services;
 
-internal sealed class CasoCBootstrapState
+internal sealed class CasoCAgentRegistry
 {
-    private CasoCBootstrapSnapshot? _snapshot;
+    private CasoCAgentSnapshot? _snapshot;
 
-    internal void SetSnapshot(CasoCBootstrapSnapshot snapshot)
+    internal void SetSnapshot(CasoCAgentSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         Interlocked.Exchange(ref _snapshot, snapshot);
     }
 
-    internal CasoCBootstrapSnapshot GetRequiredSnapshot()
+    internal CasoCAgentSnapshot GetRequiredSnapshot()
     {
         return _snapshot ?? throw new InvalidOperationException(
             "Caso C startup validation has not completed successfully.");

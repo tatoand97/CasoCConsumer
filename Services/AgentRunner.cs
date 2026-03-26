@@ -20,7 +20,7 @@ internal sealed class AgentRunner
 
     internal async Task<string> RunPromptAsync(
         ProjectOpenAIClient openAi,
-        BootstrapAgentInfo agent,
+        ValidatedAgentInfo agent,
         string prompt,
         TimeSpan timeout,
         CancellationToken cancellationToken)
