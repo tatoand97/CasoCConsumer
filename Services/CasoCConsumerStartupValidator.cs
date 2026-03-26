@@ -4,27 +4,27 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.ClientModel;
 
-namespace CasoC.Services;
+namespace CasoCConsumer.Services;
 
-internal sealed class CasoCStartupValidator
+internal sealed class CasoCConsumerStartupValidator
 {
     private readonly AIProjectClient _projectClient;
-    private readonly CasoCSettings _settings;
-    private readonly ILogger<CasoCStartupValidator> _logger;
+    private readonly CasoCConsumerSettings _settings;
+    private readonly ILogger<CasoCConsumerStartupValidator> _logger;
 
-    internal CasoCStartupValidator(
+    internal CasoCConsumerStartupValidator(
         AIProjectClient projectClient,
-        IOptions<CasoCSettings> settingsOptions,
-        ILogger<CasoCStartupValidator> logger)
+        IOptions<CasoCConsumerSettings> settingsOptions,
+        ILogger<CasoCConsumerStartupValidator> logger)
     {
         _projectClient = projectClient;
         _settings = settingsOptions.Value;
         _logger = logger;
     }
 
-    internal async Task<CasoCAgentSnapshot> ValidateAsync(CancellationToken cancellationToken)
+    internal async Task<CasoCConsumerAgentSnapshot> ValidateAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Bootstrap validation started.");
+        _logger.LogInformation("Startup validation started.");
 
         await ValidateFoundryEndpointAsync(cancellationToken);
         _logger.LogInformation("Foundry endpoint validated. Endpoint: {Endpoint}", _settings.AzureOpenAiEndpoint);
@@ -65,13 +65,13 @@ internal sealed class CasoCStartupValidator
             plannerAgent.Version,
             plannerAgent.ValidationStatus);
 
-        CasoCAgentSnapshot snapshot = new(
+        CasoCConsumerAgentSnapshot snapshot = new(
             orderAgent,
             policyAgent,
             plannerAgent,
             TimeSpan.FromSeconds(_settings.ResponsesTimeoutSeconds));
 
-        _logger.LogInformation("Bootstrap validation completed.");
+        _logger.LogInformation("Startup validation completed.");
         return snapshot;
     }
 

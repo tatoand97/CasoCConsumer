@@ -2,7 +2,7 @@ using Azure.AI.Projects.OpenAI;
 using OpenAI.Responses;
 using System.ClientModel;
 
-namespace CasoC.Services;
+namespace CasoCConsumer.Services;
 
 internal sealed class AgentRunner
 {

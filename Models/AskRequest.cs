@@ -1,4 +1,4 @@
-namespace CasoC.Models;
+namespace CasoCConsumer.Models;
 
 public sealed class AskRequest
 {

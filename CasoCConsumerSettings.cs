@@ -1,8 +1,8 @@
-namespace CasoC;
+namespace CasoCConsumer;
 
-public sealed class CasoCSettings
+public sealed class CasoCConsumerSettings
 {
-    public const string SectionName = "CasoC";
+    public const string SectionName = "CasoCConsumer";
 
     public string? AzureOpenAiEndpoint { get; init; }
 

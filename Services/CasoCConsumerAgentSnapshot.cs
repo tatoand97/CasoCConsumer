@@ -1,9 +1,9 @@
 using Azure.AI.Projects;
 using Azure.AI.Projects.OpenAI;
 
-namespace CasoC.Services;
+namespace CasoCConsumer.Services;
 
-internal sealed record CasoCAgentSnapshot(
+internal sealed record CasoCConsumerAgentSnapshot(
     ValidatedAgentInfo OrderAgent,
     ValidatedAgentInfo PolicyAgent,
     ValidatedAgentInfo PlannerAgent,

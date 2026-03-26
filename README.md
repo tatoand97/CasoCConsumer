@@ -28,7 +28,7 @@ HTTP Client
   |
 CasoCConsumer (.NET 8 Web API)
   |
-CasoCOrchestrator
+CasoCConsumerOrchestrator
   |-- OrderAgent
   |-- PolicyAgent
   '-- PlannerAgent
@@ -38,7 +38,7 @@ La orquestacion sigue en el backend. El repo `CasoCConsumer` solo consume agente
 
 ## Prerequisite
 
-El repo `CasoC` o el repo equivalente de bootstrap debe ejecutarse primero para asegurar que `PolicyAgent` y `PlannerAgent` ya existen en Foundry.
+El repo bootstrap de Caso C o el repo equivalente debe ejecutarse primero para asegurar que `PolicyAgent` y `PlannerAgent` ya existen en Foundry.
 
 Este repo asume que ya existen tres agentes accesibles:
 
@@ -52,7 +52,7 @@ Configura `appsettings.json` con referencias explicitas a tres agentes ya existe
 
 ```json
 {
-  "CasoC": {
+  "CasoCConsumer": {
     "AzureOpenAiEndpoint": "https://<resource>.services.ai.azure.com/api/projects/<project>",
     "AzureOpenAiDeployment": "<existing-deployment-name>",
     "OrderAgentId": "<existing-order-agent-id-or-name:version>",
@@ -64,7 +64,7 @@ Configura `appsettings.json` con referencias explicitas a tres agentes ya existe
 }
 ```
 
-`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por `CasoC` o por el repo de bootstrap equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
+`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por el repo bootstrap de Caso C o por un repo equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
 
 Claves requeridas:
 
@@ -188,8 +188,8 @@ curl -k https://localhost:7230/api/casoc/health
 
 La API registra como minimo:
 
-- bootstrap validation started
-- bootstrap validation completed
+- startup validation started
+- startup validation completed
 - order agent validated
 - policy agent validated
 - planner agent validated

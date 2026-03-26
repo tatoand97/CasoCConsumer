@@ -4,6 +4,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CasoCConsumer</AssemblyName>
+    <RootNamespace>CasoCConsumer</RootNamespace>
     <NoWarn>$(NoWarn);CA2252;OPENAI001</NoWarn>
   </PropertyGroup>
 

@@ -2,9 +2,9 @@ using Azure.AI.Projects.OpenAI;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace CasoC.Services;
+namespace CasoCConsumer.Services;
 
-internal sealed class CasoCOrchestrator
+internal sealed class CasoCConsumerOrchestrator
 {
     private const string SupportedOrderStatusList = "Created, Confirmed, Packed, Shipped, Delivered, Cancelled, Unknown, NotFound";
 
@@ -70,23 +70,23 @@ internal sealed class CasoCOrchestrator
 
     private readonly ProjectOpenAIClient _openAiClient;
     private readonly AgentRunner _runner;
-    private readonly CasoCAgentRegistry _agentRegistry;
+    private readonly CasoCConsumerAgentRegistry _agentRegistry;
 
-    internal CasoCOrchestrator(
+    internal CasoCConsumerOrchestrator(
         ProjectOpenAIClient openAiClient,
         AgentRunner runner,
-        CasoCAgentRegistry agentRegistry)
+        CasoCConsumerAgentRegistry agentRegistry)
     {
         _openAiClient = openAiClient;
         _runner = runner;
         _agentRegistry = agentRegistry;
     }
 
-    internal async Task<CasoCOrchestrationResult> RunAsync(
+    internal async Task<CasoCConsumerOrchestrationResult> RunAsync(
         string userRequest,
         CancellationToken cancellationToken)
     {
-        CasoCAgentSnapshot snapshot = _agentRegistry.GetRequiredSnapshot();
+        CasoCConsumerAgentSnapshot snapshot = _agentRegistry.GetRequiredSnapshot();
 
         string orderAgentResponse = await RunOrderAgentAsync(
             snapshot,
@@ -111,14 +111,14 @@ internal sealed class CasoCOrchestrator
             validatedPolicyJson,
             cancellationToken);
 
-        return new CasoCOrchestrationResult(
+        return new CasoCConsumerOrchestrationResult(
             validatedOrderJson,
             validatedPolicyJson,
             finalText);
     }
 
     private async Task<string> RunOrderAgentAsync(
-        CasoCAgentSnapshot snapshot,
+        CasoCConsumerAgentSnapshot snapshot,
         string userRequest,
         CancellationToken cancellationToken)
     {
@@ -164,7 +164,7 @@ internal sealed class CasoCOrchestrator
     }
 
     private async Task<string> RunPolicyAgentAsync(
-        CasoCAgentSnapshot snapshot,
+        CasoCConsumerAgentSnapshot snapshot,
         string validatedOrderJson,
         CancellationToken cancellationToken)
     {
@@ -200,7 +200,7 @@ internal sealed class CasoCOrchestrator
     }
 
     private async Task<string> RunPlannerAgentAsync(
-        CasoCAgentSnapshot snapshot,
+        CasoCConsumerAgentSnapshot snapshot,
         string userRequest,
         string validatedOrderJson,
         string validatedPolicyJson,
@@ -308,7 +308,7 @@ internal sealed class CasoCOrchestrator
     }
 }
 
-internal sealed record CasoCOrchestrationResult(
+internal sealed record CasoCConsumerOrchestrationResult(
     string OrderContext,
     string PolicyContext,
     string FinalAnswer);

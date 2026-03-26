@@ -1,51 +1,51 @@
 using Azure.AI.Projects;
 using Azure.Identity;
-using CasoC;
-using CasoC.Models;
-using CasoC.Services;
+using CasoCConsumer;
+using CasoCConsumer.Models;
+using CasoCConsumer.Services;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
-    .AddOptions<CasoCSettings>()
-    .Bind(builder.Configuration.GetSection(CasoCSettings.SectionName))
+    .AddOptions<CasoCConsumerSettings>()
+    .Bind(builder.Configuration.GetSection(CasoCConsumerSettings.SectionName))
     .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.AzureOpenAiEndpoint),
-        "The configuration key 'CasoC:AzureOpenAiEndpoint' is required.")
+        "The configuration key 'CasoCConsumer:AzureOpenAiEndpoint' is required.")
     .Validate(
         settings => Uri.TryCreate(settings.AzureOpenAiEndpoint, UriKind.Absolute, out Uri? endpointUri) &&
                     endpointUri.Scheme == Uri.UriSchemeHttps,
-        "The configuration key 'CasoC:AzureOpenAiEndpoint' must be a valid HTTPS endpoint.")
+        "The configuration key 'CasoCConsumer:AzureOpenAiEndpoint' must be a valid HTTPS endpoint.")
     .Validate(
         settings => settings.AzureOpenAiEndpoint!.Contains("/api/projects/", StringComparison.OrdinalIgnoreCase),
-        "The configuration key 'CasoC:AzureOpenAiEndpoint' must be a Foundry project endpoint containing '/api/projects/'.")
+        "The configuration key 'CasoCConsumer:AzureOpenAiEndpoint' must be a Foundry project endpoint containing '/api/projects/'.")
     .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.AzureOpenAiDeployment),
-        "The configuration key 'CasoC:AzureOpenAiDeployment' is required.")
+        "The configuration key 'CasoCConsumer:AzureOpenAiDeployment' is required.")
     .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.OrderAgentId),
-        "The configuration key 'CasoC:OrderAgentId' is required.")
+        "The configuration key 'CasoCConsumer:OrderAgentId' is required.")
     .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.PolicyAgentId),
-        "The configuration key 'CasoC:PolicyAgentId' is required.")
+        "The configuration key 'CasoCConsumer:PolicyAgentId' is required.")
     .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.PlannerAgentId),
-        "The configuration key 'CasoC:PlannerAgentId' is required.")
+        "The configuration key 'CasoCConsumer:PlannerAgentId' is required.")
     .Validate(
         settings => settings.ResponsesTimeoutSeconds > 0,
-        "The configuration key 'CasoC:ResponsesTimeoutSeconds' must be a positive integer.")
+        "The configuration key 'CasoCConsumer:ResponsesTimeoutSeconds' must be a positive integer.")
     .Validate(
         settings => settings.ResponsesMaxBackoffSeconds > 0,
-        "The configuration key 'CasoC:ResponsesMaxBackoffSeconds' must be a positive integer.")
+        "The configuration key 'CasoCConsumer:ResponsesMaxBackoffSeconds' must be a positive integer.")
     .ValidateOnStart();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<AzureCliCredential>();
 builder.Services.AddSingleton(sp =>
 {
-    CasoCSettings settings = sp.GetRequiredService<IOptions<CasoCSettings>>().Value;
+    CasoCConsumerSettings settings = sp.GetRequiredService<IOptions<CasoCConsumerSettings>>().Value;
     return new AIProjectClient(
         new Uri(settings.AzureOpenAiEndpoint!, UriKind.Absolute),
         sp.GetRequiredService<AzureCliCredential>());
@@ -53,13 +53,13 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton(sp => sp.GetRequiredService<AIProjectClient>().OpenAI);
 builder.Services.AddSingleton(sp =>
 {
-    CasoCSettings settings = sp.GetRequiredService<IOptions<CasoCSettings>>().Value;
+    CasoCConsumerSettings settings = sp.GetRequiredService<IOptions<CasoCConsumerSettings>>().Value;
     return new AgentRunner(TimeSpan.FromSeconds(settings.ResponsesMaxBackoffSeconds));
 });
-builder.Services.AddSingleton<CasoCAgentRegistry>();
-builder.Services.AddSingleton<CasoCStartupValidator>();
-builder.Services.AddSingleton<CasoCOrchestrator>();
-builder.Services.AddHostedService<CasoCStartupValidationHostedService>();
+builder.Services.AddSingleton<CasoCConsumerAgentRegistry>();
+builder.Services.AddSingleton<CasoCConsumerStartupValidator>();
+builder.Services.AddSingleton<CasoCConsumerOrchestrator>();
+builder.Services.AddHostedService<CasoCConsumerStartupValidationHostedService>();
 
 var app = builder.Build();
 
@@ -70,7 +70,7 @@ app.UseExceptionHandler(errorApp =>
         Exception? exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
         ILogger logger = context.RequestServices
             .GetRequiredService<ILoggerFactory>()
-            .CreateLogger("CasoC.Api");
+            .CreateLogger("CasoCConsumer.Api");
 
         if (exception is not null)
         {
@@ -95,12 +95,12 @@ app.UseExceptionHandler(errorApp =>
 
 app.UseHttpsRedirection();
 
-RouteGroupBuilder casoCApi = app.MapGroup("/api/casoc");
+RouteGroupBuilder casoCConsumerApi = app.MapGroup("/api/casoc");
 
-casoCApi.MapPost("/ask", async (
+casoCConsumerApi.MapPost("/ask", async (
     AskRequest request,
     HttpContext httpContext,
-    CasoCOrchestrator orchestrator,
+    CasoCConsumerOrchestrator orchestrator,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -122,7 +122,7 @@ casoCApi.MapPost("/ask", async (
 
     try
     {
-        CasoCOrchestrationResult result = await orchestrator.RunAsync(
+        CasoCConsumerOrchestrationResult result = await orchestrator.RunAsync(
             request.Prompt.Trim(),
             cancellationToken);
 
@@ -136,10 +136,10 @@ casoCApi.MapPost("/ask", async (
     }
 });
 
-casoCApi.MapPost("/ask/debug", async (
+casoCConsumerApi.MapPost("/ask/debug", async (
     AskRequest request,
     HttpContext httpContext,
-    CasoCOrchestrator orchestrator,
+    CasoCConsumerOrchestrator orchestrator,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -161,7 +161,7 @@ casoCApi.MapPost("/ask/debug", async (
 
     try
     {
-        CasoCOrchestrationResult result = await orchestrator.RunAsync(
+        CasoCConsumerOrchestrationResult result = await orchestrator.RunAsync(
             request.Prompt.Trim(),
             cancellationToken);
 
@@ -179,9 +179,9 @@ casoCApi.MapPost("/ask/debug", async (
     }
 });
 
-casoCApi.MapGet("/health", (CasoCAgentRegistry agentRegistry) =>
+casoCConsumerApi.MapGet("/health", (CasoCConsumerAgentRegistry agentRegistry) =>
 {
-    CasoCAgentSnapshot snapshot = agentRegistry.GetRequiredSnapshot();
+    CasoCConsumerAgentSnapshot snapshot = agentRegistry.GetRequiredSnapshot();
 
     return Results.Ok(new HealthResponse(
         "ok",
