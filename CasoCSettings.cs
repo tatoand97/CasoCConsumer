@@ -10,8 +10,9 @@ public sealed class CasoCSettings
 
     public string? OrderAgentId { get; init; }
 
-    // Opcional: si es null, vacio o "latest" se usara la version mas reciente disponible.
-    public string? OrderAgentVersion { get; init; }
+    public string? PolicyAgentId { get; init; }
+
+    public string? PlannerAgentId { get; init; }
 
     public int ResponsesTimeoutSeconds { get; init; } = 60;
 

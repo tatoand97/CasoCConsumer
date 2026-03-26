@@ -124,7 +124,7 @@ internal sealed class CasoCOrchestrator
     {
         return await _runner.RunPromptAsync(
             _openAiClient,
-            snapshot.OrderAgent.Name,
+            snapshot.OrderAgent,
             string.Format(OrderAgentPromptTemplate, userRequest),
             snapshot.ResponseTimeout,
             cancellationToken);
@@ -170,7 +170,7 @@ internal sealed class CasoCOrchestrator
     {
         return await _runner.RunPromptAsync(
             _openAiClient,
-            snapshot.PolicyAgent.Name,
+            snapshot.PolicyAgent,
             string.Format(PolicyAgentPromptTemplate, validatedOrderJson),
             snapshot.ResponseTimeout,
             cancellationToken);
@@ -208,7 +208,7 @@ internal sealed class CasoCOrchestrator
     {
         return await _runner.RunPromptAsync(
             _openAiClient,
-            snapshot.PlannerAgent.Name,
+            snapshot.PlannerAgent,
             string.Format(PlannerPromptTemplate, userRequest, validatedOrderJson, validatedPolicyJson),
             snapshot.ResponseTimeout,
             cancellationToken);

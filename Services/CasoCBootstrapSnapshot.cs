@@ -9,11 +9,17 @@ internal sealed record CasoCBootstrapSnapshot(
     BootstrapAgentInfo PlannerAgent,
     TimeSpan ResponseTimeout);
 
-internal sealed record BootstrapAgentInfo(string Id, string Name, string Version)
+internal sealed record BootstrapAgentInfo(string Id, string Name, string Version, string ValidationStatus)
 {
+    internal const string ExternalValidated = "ExternalValidated";
+
     internal static BootstrapAgentInfo FromAgentVersion(AgentVersion version)
     {
         ArgumentNullException.ThrowIfNull(version);
-        return new BootstrapAgentInfo(version.Id, version.Name, version.Version);
+        return new BootstrapAgentInfo(
+            version.Id,
+            version.Name,
+            version.Version,
+            ExternalValidated);
     }
 }

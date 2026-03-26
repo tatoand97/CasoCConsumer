@@ -28,6 +28,12 @@ builder.Services
         settings => !string.IsNullOrWhiteSpace(settings.OrderAgentId),
         "The configuration key 'CasoC:OrderAgentId' is required.")
     .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.PolicyAgentId),
+        "The configuration key 'CasoC:PolicyAgentId' is required.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.PlannerAgentId),
+        "The configuration key 'CasoC:PlannerAgentId' is required.")
+    .Validate(
         settings => settings.ResponsesTimeoutSeconds > 0,
         "The configuration key 'CasoC:ResponsesTimeoutSeconds' must be a positive integer.")
     .Validate(
@@ -50,7 +56,6 @@ builder.Services.AddSingleton(sp =>
     CasoCSettings settings = sp.GetRequiredService<IOptions<CasoCSettings>>().Value;
     return new AgentRunner(TimeSpan.FromSeconds(settings.ResponsesMaxBackoffSeconds));
 });
-builder.Services.AddSingleton<AgentReconciler>();
 builder.Services.AddSingleton<CasoCBootstrapState>();
 builder.Services.AddSingleton<CasoCBootstrapper>();
 builder.Services.AddSingleton<CasoCOrchestrator>();
@@ -180,9 +185,21 @@ casoCApi.MapGet("/health", (CasoCBootstrapState bootstrapState) =>
 
     return Results.Ok(new HealthResponse(
         "ok",
-        new AgentInfoResponse(snapshot.OrderAgent.Id, snapshot.OrderAgent.Name, snapshot.OrderAgent.Version),
-        new AgentInfoResponse(snapshot.PolicyAgent.Id, snapshot.PolicyAgent.Name, snapshot.PolicyAgent.Version),
-        new AgentInfoResponse(snapshot.PlannerAgent.Id, snapshot.PlannerAgent.Name, snapshot.PlannerAgent.Version)));
+        new AgentInfoResponse(
+            snapshot.OrderAgent.Id,
+            snapshot.OrderAgent.Name,
+            snapshot.OrderAgent.Version,
+            snapshot.OrderAgent.ValidationStatus),
+        new AgentInfoResponse(
+            snapshot.PolicyAgent.Id,
+            snapshot.PolicyAgent.Name,
+            snapshot.PolicyAgent.Version,
+            snapshot.PolicyAgent.ValidationStatus),
+        new AgentInfoResponse(
+            snapshot.PlannerAgent.Id,
+            snapshot.PlannerAgent.Name,
+            snapshot.PlannerAgent.Version,
+            snapshot.PlannerAgent.ValidationStatus)));
 });
 
 app.Run();

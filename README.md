@@ -1,85 +1,100 @@
-# Caso C API - Orquestacion multi-agente por HTTP (.NET 8, Responses API)
+# Caso C Consumer API
 
-API ASP.NET Core .NET 8 que expone el Caso C como servicio HTTP y mantiene la orquestacion en codigo del backend.
+API ASP.NET Core .NET 8 para consumo puro del Caso C por HTTP.
 
 ## Que hace
 
-- Reutiliza un `OrderAgent` existente mediante `OrderAgentId`.
-- Crea o reconcilia `PolicyAgent` al iniciar la aplicacion.
-- Crea o reconcilia `PlannerAgent` al iniciar la aplicacion.
+- Carga configuracion.
+- Valida el endpoint de Foundry al iniciar.
+- Valida que existan y sean accesibles `OrderAgentId`, `PolicyAgentId` y `PlannerAgentId`.
+- Guarda en memoria los ids, nombres y versiones resueltas.
 - Orquesta por request el flujo `OrderAgent -> PolicyAgent -> PlannerAgent`.
-- Usa Responses API con polling hasta estado terminal.
-- Devuelve al cliente solo la respuesta final del `PlannerAgent`.
+- Expone `POST /api/casoc/ask`, `POST /api/casoc/ask/debug` y `GET /api/casoc/health`.
+
+## Que no hace
+
+- No crea agentes.
+- No reconcilia agentes.
+- No crea versiones nuevas.
+- No modifica infraestructura de Foundry.
+- No introduce Workflows.
+- No introduce `ManagerAgent`.
+- No usa tools tipo `agent`.
 
 ## Arquitectura
 
 ```text
 HTTP Client
   |
-CasoC API (.NET 8 Web API)
+CasoCConsumer (.NET 8 Web API)
   |
-App Orchestrator in code
+CasoCOrchestrator
   |-- OrderAgent
   |-- PolicyAgent
   '-- PlannerAgent
 ```
 
-La API no usa Foundry Workflows, no introduce `ManagerAgent`, no usa tools tipo `agent` y no mueve la orquestacion fuera del backend.
+La orquestacion sigue en el backend. El repo `CasoCConsumer` solo consume agentes externos ya preparados.
 
-## Bootstrap y runtime
+## Prerequisite
 
-Al arrancar la API:
+El repo `CasoC` o el repo equivalente de bootstrap debe ejecutarse primero para asegurar que `PolicyAgent` y `PlannerAgent` ya existen en Foundry.
 
-- carga y valida configuracion
-- valida acceso al proyecto Foundry
-- valida `OrderAgentId`
-- reconcilia `PolicyAgent`
-- reconcilia `PlannerAgent`
-- guarda en memoria los ids, nombres y versiones resueltas
+Este repo asume que ya existen tres agentes accesibles:
 
-En cada request:
-
-- recibe el prompt del usuario
-- ejecuta `OrderAgent -> PolicyAgent -> PlannerAgent`
-- devuelve la respuesta final HTTP
+- `OrderAgent`
+- `PolicyAgent`
+- `PlannerAgent`
 
 ## Configuracion
 
-Configura `appsettings.json`:
+Configura `appsettings.json` con los tres agentes existentes:
 
 ```json
 {
   "CasoC": {
     "AzureOpenAiEndpoint": "https://<resource>.services.ai.azure.com/api/projects/<project>",
     "AzureOpenAiDeployment": "<deployment-name>",
-    "OrderAgentId": "<existing-order-agent-id>",
+    "OrderAgentId": "OrderAgent:3",
+    "PolicyAgentId": "policy-agent-casec:2",
+    "PlannerAgentId": "planner-agent-casec-composer:1",
     "ResponsesTimeoutSeconds": 60,
     "ResponsesMaxBackoffSeconds": 8
   }
 }
 ```
 
-Opcionalmente puedes agregar `OrderAgentVersion`. Si no se define, la API usa la version mas reciente.
+Claves requeridas:
 
-Validaciones aplicadas al arranque:
+- `AzureOpenAiEndpoint`
+- `AzureOpenAiDeployment`
+- `OrderAgentId`
+- `PolicyAgentId`
+- `PlannerAgentId`
+- `ResponsesTimeoutSeconds`
+- `ResponsesMaxBackoffSeconds`
 
-- `AzureOpenAiEndpoint` debe ser HTTPS
-- `AzureOpenAiEndpoint` debe contener `/api/projects/`
-- `OrderAgentId` es obligatorio
-- `ResponsesTimeoutSeconds` debe ser mayor que `0`
-- `ResponsesMaxBackoffSeconds` debe ser mayor que `0`
+Validaciones al arranque:
 
-## Como correrla
+- `AzureOpenAiEndpoint` debe ser HTTPS.
+- `AzureOpenAiEndpoint` debe contener `/api/projects/`.
+- Los tres `*AgentId` deben estar configurados.
+- Los tres `*AgentId` deben existir y ser accesibles en Foundry.
+- `ResponsesTimeoutSeconds` debe ser mayor que `0`.
+- `ResponsesMaxBackoffSeconds` debe ser mayor que `0`.
 
-```powershell
-dotnet restore
-dotnet run
-```
+## Bootstrap de la API
 
-En desarrollo, `launchSettings.json` expone:
+Al iniciar:
 
-- `https://localhost:7230`
-- `http://localhost:5088`
+- valida configuracion
+- valida acceso al endpoint de Foundry
+- valida `OrderAgentId`
+- valida `PolicyAgentId`
+- valida `PlannerAgentId`
+- guarda ids, nombres y versiones resueltas con estado `ExternalValidated`
+
+No hay reconciliacion ni creacion de infraestructura.
 
 ## Endpoints
 
@@ -102,6 +117,19 @@ Response `200`:
 }
 ```
 
+### `POST /api/casoc/ask/debug`
+
+Response `200`:
+
+```json
+{
+  "orderContext": "{ ... }",
+  "policyContext": "{ ... }",
+  "finalAnswer": "La orden ...",
+  "traceId": "0HNTK3U4J2R5A:00000002"
+}
+```
+
 ### `GET /api/casoc/health`
 
 Response `200`:
@@ -112,33 +140,35 @@ Response `200`:
   "orderAgent": {
     "id": "OrderAgent:3",
     "name": "OrderAgent",
-    "version": "3"
+    "version": "3",
+    "validationStatus": "ExternalValidated"
   },
   "policyAgent": {
     "id": "policy-agent-casec:2",
     "name": "policy-agent-casec",
-    "version": "2"
+    "version": "2",
+    "validationStatus": "ExternalValidated"
   },
   "plannerAgent": {
     "id": "planner-agent-casec-composer:1",
     "name": "planner-agent-casec-composer",
-    "version": "1"
+    "version": "1",
+    "validationStatus": "ExternalValidated"
   }
 }
 ```
 
-### `POST /api/casoc/ask/debug`
+## Como correrla
 
-Devuelve contexto intermedio validado para depuracion:
-
-```json
-{
-  "orderContext": "{ ... }",
-  "policyContext": "{ ... }",
-  "finalAnswer": "La orden ...",
-  "traceId": "0HNTK3U4J2R5A:00000002"
-}
+```powershell
+dotnet restore
+dotnet run
 ```
+
+En desarrollo, `launchSettings.json` expone:
+
+- `https://localhost:7230`
+- `http://localhost:5088`
 
 ## Ejemplos de curl
 
@@ -156,16 +186,11 @@ curl -k https://localhost:7230/api/casoc/health
 
 La API registra como minimo:
 
-- bootstrap started/completed
+- bootstrap validation started
+- bootstrap validation completed
 - order agent validated
-- policy agent reconciled
-- planner agent reconciled
+- policy agent validated
+- planner agent validated
 - request received
 - orchestration completed
 - orchestration failed
-
-## Notas
-
-- Se reutilizan `CasoCSettings`, `AgentReconciler`, `AgentRunner`, `PolicyAgentFactory` y `PlannerAgentFactory`.
-- `PolicyAgent` y `PlannerAgent` se reconcilian una sola vez al arranque.
-- La aplicacion sigue orquestando el Caso C desde codigo, igual que en el repo original.

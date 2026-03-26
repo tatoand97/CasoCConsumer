@@ -1,6 +1,5 @@
 using Azure.AI.Projects;
 using Azure.AI.Projects.OpenAI;
-using CasoC.Agents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.ClientModel;
@@ -10,18 +9,15 @@ namespace CasoC.Services;
 internal sealed class CasoCBootstrapper
 {
     private readonly AIProjectClient _projectClient;
-    private readonly AgentReconciler _reconciler;
     private readonly IOptions<CasoCSettings> _settingsOptions;
     private readonly ILogger<CasoCBootstrapper> _logger;
 
     internal CasoCBootstrapper(
         AIProjectClient projectClient,
-        AgentReconciler reconciler,
         IOptions<CasoCSettings> settingsOptions,
         ILogger<CasoCBootstrapper> logger)
     {
         _projectClient = projectClient;
-        _reconciler = reconciler;
         _settingsOptions = settingsOptions;
         _logger = logger;
     }
@@ -29,80 +25,145 @@ internal sealed class CasoCBootstrapper
     internal async Task<CasoCBootstrapSnapshot> BootstrapAsync(CancellationToken cancellationToken)
     {
         CasoCSettings settings = _settingsOptions.Value;
-        _logger.LogInformation("Bootstrap started.");
+        _logger.LogInformation("Bootstrap validation started.");
 
         await ValidateIdentityCanAccessProjectAsync(_projectClient, cancellationToken);
 
-        AgentRecord orderAgent = await ValidateOrderAgentAsync(
-            _projectClient,
+        BootstrapAgentInfo orderAgent = await ValidateConfiguredAgentAsync(
             settings.OrderAgentId!,
+            "Order",
             cancellationToken);
 
-        AgentVersion orderAgentVersion = await ResolveOrderAgentVersionAsync(
-            _projectClient,
+        _logger.LogInformation(
+            "Order agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
+            orderAgent.Id,
             orderAgent.Name,
-            settings.OrderAgentVersion,
+            orderAgent.Version,
+            orderAgent.ValidationStatus);
+
+        BootstrapAgentInfo policyAgent = await ValidateConfiguredAgentAsync(
+            settings.PolicyAgentId!,
+            "Policy",
             cancellationToken);
 
         _logger.LogInformation(
-            "Order agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}",
-            orderAgentVersion.Id,
-            orderAgentVersion.Name,
-            orderAgentVersion.Version);
+            "Policy agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
+            policyAgent.Id,
+            policyAgent.Name,
+            policyAgent.Version,
+            policyAgent.ValidationStatus);
 
-        ReconcileResult policyResult = await _reconciler.ReconcileAsync(
-            PolicyAgentFactory.AgentName,
-            PolicyAgentFactory.Build(settings.AzureOpenAiDeployment!),
+        BootstrapAgentInfo plannerAgent = await ValidateConfiguredAgentAsync(
+            settings.PlannerAgentId!,
+            "Planner",
             cancellationToken);
 
         _logger.LogInformation(
-            "Policy agent reconciled. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ReconciliationStatus: {ReconciliationStatus}",
-            policyResult.Version.Id,
-            policyResult.Version.Name,
-            policyResult.Version.Version,
-            policyResult.ReconciliationStatus);
-
-        ReconcileResult plannerResult = await _reconciler.ReconcileAsync(
-            PlannerAgentFactory.AgentName,
-            PlannerAgentFactory.Build(settings.AzureOpenAiDeployment!),
-            cancellationToken);
-
-        _logger.LogInformation(
-            "Planner agent reconciled. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ReconciliationStatus: {ReconciliationStatus}",
-            plannerResult.Version.Id,
-            plannerResult.Version.Name,
-            plannerResult.Version.Version,
-            plannerResult.ReconciliationStatus);
+            "Planner agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
+            plannerAgent.Id,
+            plannerAgent.Name,
+            plannerAgent.Version,
+            plannerAgent.ValidationStatus);
 
         CasoCBootstrapSnapshot snapshot = new(
-            BootstrapAgentInfo.FromAgentVersion(orderAgentVersion),
-            BootstrapAgentInfo.FromAgentVersion(policyResult.Version),
-            BootstrapAgentInfo.FromAgentVersion(plannerResult.Version),
+            orderAgent,
+            policyAgent,
+            plannerAgent,
             TimeSpan.FromSeconds(settings.ResponsesTimeoutSeconds));
 
-        _logger.LogInformation("Bootstrap completed.");
+        _logger.LogInformation("Bootstrap validation completed.");
         return snapshot;
     }
 
-    private static async Task<AgentRecord> ValidateOrderAgentAsync(
-        AIProjectClient projectClient,
-        string orderAgentId,
+    private async Task<BootstrapAgentInfo> ValidateConfiguredAgentAsync(
+        string configuredAgentId,
+        string agentLabel,
+        CancellationToken cancellationToken)
+    {
+        ConfiguredAgentReference? reference;
+        if (ConfiguredAgentReference.TryParse(configuredAgentId, out reference))
+        {
+            AgentVersion version = await GetAgentVersionAsync(reference!, agentLabel, cancellationToken);
+            return BootstrapAgentInfo.FromAgentVersion(version);
+        }
+
+        AgentRecord agent = await GetAgentAsync(configuredAgentId, agentLabel, cancellationToken);
+        AgentVersion versionFromName = await GetLatestAgentVersionAsync(
+            agent.Name,
+            configuredAgentId,
+            agentLabel,
+            cancellationToken);
+
+        return BootstrapAgentInfo.FromAgentVersion(versionFromName);
+    }
+
+    private async Task<AgentRecord> GetAgentAsync(
+        string configuredAgentId,
+        string agentLabel,
         CancellationToken cancellationToken)
     {
         try
         {
-            ClientResult<AgentRecord> response = await projectClient.Agents.GetAgentAsync(
-                orderAgentId,
+            ClientResult<AgentRecord> response = await _projectClient.Agents.GetAgentAsync(
+                configuredAgentId,
                 cancellationToken);
 
             return response.Value;
         }
         catch (ClientResultException ex) when (ex.Status == 404)
         {
-            throw new InvalidOperationException(
-                $"The configured OrderAgentId '{orderAgentId}' was not found or is not accessible in the Foundry project.",
-                ex);
+            throw BuildAgentNotFoundException(configuredAgentId, agentLabel, ex);
         }
+    }
+
+    private async Task<AgentVersion> GetAgentVersionAsync(
+        ConfiguredAgentReference reference,
+        string agentLabel,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ClientResult<AgentVersion> response = await _projectClient.Agents.GetAgentVersionAsync(
+                reference.Name,
+                reference.Version,
+                cancellationToken);
+
+            return response.Value;
+        }
+        catch (ClientResultException ex) when (ex.Status == 404)
+        {
+            await foreach (AgentVersion version in _projectClient.Agents.GetAgentVersionsAsync(
+                               agentName: reference.Name,
+                               cancellationToken: cancellationToken))
+            {
+                if (string.Equals(version.Id, reference.RawValue, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(version.Version, reference.Version, StringComparison.OrdinalIgnoreCase))
+                {
+                    return version;
+                }
+            }
+
+            throw BuildAgentNotFoundException(reference.RawValue, agentLabel, ex);
+        }
+    }
+
+    private async Task<AgentVersion> GetLatestAgentVersionAsync(
+        string agentName,
+        string configuredAgentId,
+        string agentLabel,
+        CancellationToken cancellationToken)
+    {
+        await foreach (AgentVersion version in _projectClient.Agents.GetAgentVersionsAsync(
+                           agentName: agentName,
+                           limit: 1,
+                           order: AgentListOrder.Descending,
+                           cancellationToken: cancellationToken))
+        {
+            return version;
+        }
+
+        throw new InvalidOperationException(
+            $"The configured {agentLabel}AgentId '{configuredAgentId}' resolved to agent '{agentName}', but no accessible versions were found.");
     }
 
     private static async Task ValidateIdentityCanAccessProjectAsync(
@@ -115,41 +176,42 @@ internal sealed class CasoCBootstrapper
         }
     }
 
-    private static async Task<AgentVersion> ResolveOrderAgentVersionAsync(
-        AIProjectClient projectClient,
-        string agentName,
-        string? versionSetting,
-        CancellationToken cancellationToken)
+    private static InvalidOperationException BuildAgentNotFoundException(
+        string configuredAgentId,
+        string agentLabel,
+        Exception innerException)
     {
-        if (string.IsNullOrWhiteSpace(versionSetting) ||
-            string.Equals(versionSetting, "latest", StringComparison.OrdinalIgnoreCase))
+        return new InvalidOperationException(
+            $"The configured {agentLabel}AgentId '{configuredAgentId}' was not found or is not accessible in the Foundry project.",
+            innerException);
+    }
+
+    private sealed record ConfiguredAgentReference(string RawValue, string Name, string Version)
+    {
+        internal static bool TryParse(string value, out ConfiguredAgentReference? reference)
         {
-            await foreach (AgentVersion version in projectClient.Agents.GetAgentVersionsAsync(
-                               agentName: agentName,
-                               limit: 1,
-                               order: AgentListOrder.Descending,
-                               cancellationToken: cancellationToken))
+            reference = null;
+
+            if (string.IsNullOrWhiteSpace(value))
             {
-                return version;
+                return false;
             }
 
-            throw new InvalidOperationException(
-                $"No version was found for the order agent '{agentName}'.");
-        }
-
-        await foreach (AgentVersion version in projectClient.Agents.GetAgentVersionsAsync(
-                           agentName: agentName,
-                           cancellationToken: cancellationToken))
-        {
-            if (string.Equals(version.Name, versionSetting, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(version.Id, versionSetting, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(version.Version, versionSetting, StringComparison.OrdinalIgnoreCase))
+            int separatorIndex = value.LastIndexOf(':');
+            if (separatorIndex <= 0 || separatorIndex >= value.Length - 1)
             {
-                return version;
+                return false;
             }
-        }
 
-        throw new InvalidOperationException(
-            $"The configured order agent version '{versionSetting}' was not found for agent '{agentName}'.");
+            string name = value[..separatorIndex].Trim();
+            string version = value[(separatorIndex + 1)..].Trim();
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
+            {
+                return false;
+            }
+
+            reference = new ConfiguredAgentReference(value.Trim(), name, version);
+            return true;
+        }
     }
 }

@@ -13,6 +13,6 @@ internal sealed class CasoCBootstrapState
     internal CasoCBootstrapSnapshot GetRequiredSnapshot()
     {
         return _snapshot ?? throw new InvalidOperationException(
-            "Caso C bootstrap has not completed successfully.");
+            "Caso C startup validation has not completed successfully.");
     }
 }

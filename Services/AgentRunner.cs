@@ -20,7 +20,7 @@ internal sealed class AgentRunner
 
     internal async Task<string> RunPromptAsync(
         ProjectOpenAIClient openAi,
-        string agentResponseName,
+        BootstrapAgentInfo agent,
         string prompt,
         TimeSpan timeout,
         CancellationToken cancellationToken)
@@ -30,7 +30,8 @@ internal sealed class AgentRunner
             throw new InvalidOperationException("Timeout must be a positive time span.");
         }
 
-        ProjectResponsesClient responseClient = openAi.GetProjectResponsesClientForAgent(agentResponseName);
+        ProjectResponsesClient responseClient = openAi.GetProjectResponsesClientForAgent(
+            new AgentReference(agent.Name, agent.Version));
         cancellationToken.ThrowIfCancellationRequested();
         ClientResult<ResponseResult> created = await responseClient.CreateResponseAsync(prompt);
         ResponseResult response = created.Value;
