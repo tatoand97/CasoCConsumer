@@ -1,0 +1,24 @@
+@CasoCConsumer_HostAddress = https://localhost:7230
+
+GET {{CasoCConsumer_HostAddress}}/api/casoc/health
+Accept: application/json
+
+###
+
+POST {{CasoCConsumer_HostAddress}}/api/casoc/ask
+Content-Type: application/json
+
+{
+  "prompt": "Dame el estado de la orden ORD-000001 y dime si requiere accion."
+}
+
+###
+
+POST {{CasoCConsumer_HostAddress}}/api/casoc/ask/debug
+Content-Type: application/json
+
+{
+  "prompt": "Dame el estado de la orden ORD-000001 y dime si requiere accion."
+}
+
+###
