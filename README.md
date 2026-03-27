@@ -1,23 +1,35 @@
 # CasoCConsumer API
 
-API consumer HTTP ASP.NET Core .NET 10 para el Caso C A2A.
+Consumidor HTTP ASP.NET Core en `.NET 10` para el Caso C A2A real.
 
-Este repo invoca solo a `PlannerAgent`. La delegacion hacia otros agentes ocurre dentro de `PlannerAgent` mediante A2A tool. `CasoCConsumer` no hace fan-out ni orquestacion multiagente en codigo.
+Este repo es solo el runtime de consumo. El backend valida e invoca unicamente a `PlannerAgent`; la delegacion hacia `OrderAgent` y `PolicyAgent` ocurre dentro de `PlannerAgent` por A2A. `CasoCConsumer` no hace fan-out backend, no reconcilia agentes y no crea infraestructura.
+
+## Arquitectura objetivo
+
+```text
+Cliente HTTP
+  ↓
+CasoCConsumer
+  ↓
+PlannerAgent
+  ├─ A2A → OrderAgent
+  └─ A2A → PolicyAgent
+```
 
 ## Prerequisite
 
 Antes de levantar este repo:
 
-- tener instalado el SDK de .NET 10
+- tener instalado el SDK de `.NET 10`
 - ejecutar el repo bootstrap `CasoC`
 - tener creado o reconciliado `PlannerAgent`
 - asegurar que `PlannerAgent` tenga sus conexiones A2A validas
 
-El bootstrap y la reconciliacion de agentes viven en `CasoC`, no en este runtime.
+El bootstrap del caso y la reconciliacion de agentes viven en `CasoC`, no en este runtime.
 
 ## Configuracion
 
-`appsettings.json` debe usar solo esta configuracion:
+`appsettings.json` debe usar solo esta configuracion de runtime:
 
 ```json
 {
@@ -40,12 +52,12 @@ Notas:
 ## Que hace
 
 - valida configuracion
-- valida acceso al proyecto Foundry
+- valida endpoint Foundry y acceso al proyecto
 - valida externamente `PlannerAgentId`
 - guarda en memoria `id`, `name` y `version` del planner
 - expone `POST /api/casoc/ask`, `POST /api/casoc/ask/debug` y `GET /api/casoc/health`
-- envia el prompt al `PlannerAgent`
-- devuelve la respuesta final al cliente
+- envia el prompt solo a `PlannerAgent`
+- devuelve la respuesta final del planner al cliente
 
 ## Out of scope
 
@@ -53,7 +65,7 @@ Notas:
 - direct calls to `PolicyAgent`
 - workflow orchestration
 - agent reconciliation
-- infraestructura Foundry
+- creacion de infraestructura Foundry
 
 ## Endpoints
 
@@ -63,7 +75,7 @@ Request:
 
 ```json
 {
-  "prompt": "Dame el estado de la orden ORD-000001 y cualquier accion requerida."
+  "prompt": "Dame el estado de la orden ORD-000001 y dime si requiere accion."
 }
 ```
 
@@ -119,13 +131,13 @@ En desarrollo, `launchSettings.json` expone:
 ```powershell
 curl -k -X POST https://localhost:7230/api/casoc/ask `
   -H "Content-Type: application/json" `
-  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y cualquier accion requerida.\"}"
+  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y dime si requiere accion.\"}"
 ```
 
 ```powershell
 curl -k -X POST https://localhost:7230/api/casoc/ask/debug `
   -H "Content-Type: application/json" `
-  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y cualquier accion requerida.\"}"
+  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y dime si requiere accion.\"}"
 ```
 
 ```powershell
