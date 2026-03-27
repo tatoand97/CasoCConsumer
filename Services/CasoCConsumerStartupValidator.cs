@@ -29,45 +29,18 @@ internal sealed class CasoCConsumerStartupValidator
         await ValidateFoundryEndpointAsync(cancellationToken);
         _logger.LogInformation("Foundry endpoint validated. Endpoint: {Endpoint}", _settings.AzureOpenAiEndpoint);
 
-        ValidatedAgentInfo orderAgent = await ValidateConfiguredAgentAsync(
-            _settings.OrderAgentId!,
-            "Order",
-            cancellationToken);
-
-        _logger.LogInformation(
-            "Order agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
-            orderAgent.Id,
-            orderAgent.Name,
-            orderAgent.Version,
-            orderAgent.ValidationStatus);
-
-        ValidatedAgentInfo policyAgent = await ValidateConfiguredAgentAsync(
-            _settings.PolicyAgentId!,
-            "Policy",
-            cancellationToken);
-
-        _logger.LogInformation(
-            "Policy agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
-            policyAgent.Id,
-            policyAgent.Name,
-            policyAgent.Version,
-            policyAgent.ValidationStatus);
-
         ValidatedAgentInfo plannerAgent = await ValidateConfiguredAgentAsync(
             _settings.PlannerAgentId!,
             "Planner",
             cancellationToken);
 
         _logger.LogInformation(
-            "Planner agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}. ValidationStatus: {ValidationStatus}",
+            "Planner agent validated. AgentId: {AgentId}. AgentName: {AgentName}. AgentVersion: {AgentVersion}",
             plannerAgent.Id,
             plannerAgent.Name,
-            plannerAgent.Version,
-            plannerAgent.ValidationStatus);
+            plannerAgent.Version);
 
         CasoCConsumerAgentSnapshot snapshot = new(
-            orderAgent,
-            policyAgent,
             plannerAgent,
             TimeSpan.FromSeconds(_settings.ResponsesTimeoutSeconds));
 
@@ -80,40 +53,14 @@ internal sealed class CasoCConsumerStartupValidator
         string agentLabel,
         CancellationToken cancellationToken)
     {
-        ConfiguredAgentReference? reference;
-        if (ConfiguredAgentReference.TryParse(configuredAgentId, out reference))
+        if (ConfiguredAgentReference.TryParse(configuredAgentId, out ConfiguredAgentReference? reference))
         {
             AgentVersion version = await GetAgentVersionAsync(reference!, agentLabel, cancellationToken);
             return ValidatedAgentInfo.FromAgentVersion(version);
         }
 
-        AgentRecord agent = await GetAgentAsync(configuredAgentId, agentLabel, cancellationToken);
-        AgentVersion versionFromName = await GetLatestAgentVersionAsync(
-            agent.Name,
-            configuredAgentId,
-            agentLabel,
-            cancellationToken);
-
-        return ValidatedAgentInfo.FromAgentVersion(versionFromName);
-    }
-
-    private async Task<AgentRecord> GetAgentAsync(
-        string configuredAgentId,
-        string agentLabel,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            ClientResult<AgentRecord> response = await _projectClient.Agents.GetAgentAsync(
-                configuredAgentId,
-                cancellationToken);
-
-            return response.Value;
-        }
-        catch (ClientResultException ex) when (ex.Status == 404)
-        {
-            throw BuildAgentNotFoundException(configuredAgentId, agentLabel, ex);
-        }
+        throw new InvalidOperationException(
+            $"The configured {agentLabel}AgentId '{configuredAgentId}' must be an explicit agent version reference in the format '<agent-name>:<version>'.");
     }
 
     private async Task<AgentVersion> GetAgentVersionAsync(
@@ -145,25 +92,6 @@ internal sealed class CasoCConsumerStartupValidator
 
             throw BuildAgentNotFoundException(reference.RawValue, agentLabel, ex);
         }
-    }
-
-    private async Task<AgentVersion> GetLatestAgentVersionAsync(
-        string agentName,
-        string configuredAgentId,
-        string agentLabel,
-        CancellationToken cancellationToken)
-    {
-        await foreach (AgentVersion version in _projectClient.Agents.GetAgentVersionsAsync(
-                           agentName: agentName,
-                           limit: 1,
-                           order: AgentListOrder.Descending,
-                           cancellationToken: cancellationToken))
-        {
-            return version;
-        }
-
-        throw new InvalidOperationException(
-            $"The configured {agentLabel}AgentId '{configuredAgentId}' resolved to agent '{agentName}', but no accessible versions were found.");
     }
 
     private async Task ValidateFoundryEndpointAsync(CancellationToken cancellationToken)

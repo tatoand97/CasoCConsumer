@@ -1,103 +1,58 @@
 # CasoCConsumer API
 
-API ASP.NET Core .NET 8 para consumo HTTP puro del caso C.
+Consumer HTTP ASP.NET Core .NET 10 para el Caso C A2A.
 
-## Que hace
+Este repo invoca solo a `PlannerAgent`. La delegacion hacia otros agentes ocurre dentro de `PlannerAgent` mediante A2A tool. `CasoCConsumer` no hace fan-out ni orquestacion multiagente en codigo.
 
-- Carga configuracion.
-- Valida el endpoint de Foundry al iniciar.
-- Valida que existan y sean accesibles `OrderAgentId`, `PolicyAgentId` y `PlannerAgentId`.
-- Guarda en memoria los ids, nombres y versiones resueltas.
-- Orquesta por request el flujo `OrderAgent -> PolicyAgent -> PlannerAgent`.
-- Expone `POST /api/casoc/ask`, `POST /api/casoc/ask/debug` y `GET /api/casoc/health`.
+## Prerequisite
 
-## Que no hace
+Antes de levantar este repo:
 
-- No crea agentes.
-- No reconcilia agentes.
-- No crea versiones nuevas.
-- No modifica infraestructura de Foundry.
-- No introduce Workflows.
-- No introduce `ManagerAgent`.
-- No usa tools tipo `agent`.
+- ejecutar el repo bootstrap `CasoC`
+- tener creado o reconciliado `PlannerAgent`
+- asegurar que `PlannerAgent` tenga sus conexiones A2A validas
 
-## Arquitectura
-
-```text
-HTTP Client
-  |
-CasoCConsumer (.NET 8 Web API)
-  |
-CasoCConsumerOrchestrator
-  |-- OrderAgent
-  |-- PolicyAgent
-  '-- PlannerAgent
-```
-
-La orquestacion sigue en el backend. El repo `CasoCConsumer` solo consume agentes externos ya preparados.
-El repo `CasoC` queda como bootstrap / IaC logico; este runtime no crea ni reconcilia agentes.
-
-## Prerequisito
-
-El repo bootstrap `CasoC`, o un repo equivalente, debe ejecutarse primero para asegurar que los agentes ya existen en Foundry antes de levantar `CasoCConsumer`.
-
-Este repo asume que ya existen tres agentes accesibles:
-
-- `OrderAgent`
-- `PolicyAgent`
-- `PlannerAgent`
+El bootstrap y la reconciliacion de agentes viven en `CasoC`, no en este runtime.
 
 ## Configuracion
 
-Configura `appsettings.json` con referencias explicitas a tres agentes ya existentes:
+`appsettings.json` debe usar solo esta configuracion:
 
 ```json
 {
   "CasoCConsumer": {
     "AzureOpenAiEndpoint": "https://<resource>.services.ai.azure.com/api/projects/<project>",
-    "AzureOpenAiDeployment": "<existing-deployment-name>",
-    "OrderAgentId": "<existing-order-agent-id-or-name:version>",
-    "PolicyAgentId": "<existing-policy-agent-id-or-name:version>",
-    "PlannerAgentId": "<existing-planner-agent-id-or-name:version>",
+    "AzureOpenAiDeployment": "<deployment-name>",
+    "PlannerAgentId": "<planner-agent-version-id>",
     "ResponsesTimeoutSeconds": 60,
     "ResponsesMaxBackoffSeconds": 8
   }
 }
 ```
 
-`OrderAgentId`, `PolicyAgentId` y `PlannerAgentId` deben apuntar a agentes ya creados por el repo bootstrap `CasoC` o por un repo equivalente. Se pueden configurar como id accesible del agente o como referencia `name:version` cuando esa version ya existe.
+Notas:
 
-Claves requeridas:
+- `AzureOpenAiEndpoint` debe ser HTTPS y contener `/api/projects/`
+- `PlannerAgentId` debe ser una referencia explicita de version con formato `<agent-name>:<version>`
+- `ResponsesTimeoutSeconds` y `ResponsesMaxBackoffSeconds` deben ser mayores que `0`
 
-- `AzureOpenAiEndpoint`
-- `AzureOpenAiDeployment`
-- `OrderAgentId`
-- `PolicyAgentId`
-- `PlannerAgentId`
-- `ResponsesTimeoutSeconds`
-- `ResponsesMaxBackoffSeconds`
-
-Validaciones al arranque:
-
-- `AzureOpenAiEndpoint` debe ser HTTPS.
-- `AzureOpenAiEndpoint` debe contener `/api/projects/`.
-- Los tres `*AgentId` deben estar configurados.
-- Los tres `*AgentId` deben existir y ser accesibles en Foundry.
-- `ResponsesTimeoutSeconds` debe ser mayor que `0`.
-- `ResponsesMaxBackoffSeconds` debe ser mayor que `0`.
-
-## Validacion de arranque
-
-Al iniciar:
+## Que hace
 
 - valida configuracion
-- valida acceso al endpoint de Foundry
-- valida `OrderAgentId`
-- valida `PolicyAgentId`
-- valida `PlannerAgentId`
-- guarda ids, nombres y versiones resueltas con estado `ExternalValidated`
+- valida acceso al proyecto Foundry
+- valida externamente `PlannerAgentId`
+- guarda en memoria `id`, `name` y `version` del planner
+- expone `POST /api/casoc/ask`, `POST /api/casoc/ask/debug` y `GET /api/casoc/health`
+- envia el prompt al `PlannerAgent`
+- devuelve la respuesta final al cliente
 
-No hay reconciliacion ni creacion de infraestructura.
+## Out of scope
+
+- direct calls to `OrderAgent`
+- direct calls to `PolicyAgent`
+- workflow orchestration
+- agent reconciliation
+- infraestructura Foundry
 
 ## Endpoints
 
@@ -107,7 +62,7 @@ Request:
 
 ```json
 {
-  "prompt": "Dame el estado de la orden ORD-000001 y dime si requiere accion."
+  "prompt": "Dame el estado de la orden ORD-000001 y cualquier accion requerida."
 }
 ```
 
@@ -126,9 +81,7 @@ Response `200`:
 
 ```json
 {
-  "orderContext": "{ ... }",
-  "policyContext": "{ ... }",
-  "finalAnswer": "La orden ...",
+  "plannerAnswer": "La orden ORD-000001 ...",
   "traceId": "0HNTK3U4J2R5A:00000002"
 }
 ```
@@ -140,23 +93,10 @@ Response `200`:
 ```json
 {
   "status": "ok",
-  "orderAgent": {
-    "id": "OrderAgent:3",
-    "name": "OrderAgent",
-    "version": "3",
-    "validationStatus": "ExternalValidated"
-  },
-  "policyAgent": {
-    "id": "policy-agent-casec:2",
-    "name": "policy-agent-casec",
-    "version": "2",
-    "validationStatus": "ExternalValidated"
-  },
   "plannerAgent": {
     "id": "planner-agent-casec-composer:1",
     "name": "planner-agent-casec-composer",
-    "version": "1",
-    "validationStatus": "ExternalValidated"
+    "version": "1"
   }
 }
 ```
@@ -178,7 +118,13 @@ En desarrollo, `launchSettings.json` expone:
 ```powershell
 curl -k -X POST https://localhost:7230/api/casoc/ask `
   -H "Content-Type: application/json" `
-  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y dime si requiere accion.\"}"
+  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y cualquier accion requerida.\"}"
+```
+
+```powershell
+curl -k -X POST https://localhost:7230/api/casoc/ask/debug `
+  -H "Content-Type: application/json" `
+  -d "{\"prompt\":\"Dame el estado de la orden ORD-000001 y cualquier accion requerida.\"}"
 ```
 
 ```powershell
@@ -190,10 +136,9 @@ curl -k https://localhost:7230/api/casoc/health
 La API registra como minimo:
 
 - startup validation started
-- startup validation completed
-- order agent validated
-- policy agent validated
+- foundry endpoint validated
 - planner agent validated
-- request received
-- orchestration completed
-- orchestration failed
+- startup validation completed
+- planneragent request received
+- planneragent request completed
+- planneragent request failed

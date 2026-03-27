@@ -25,12 +25,6 @@ builder.Services
         settings => !string.IsNullOrWhiteSpace(settings.AzureOpenAiDeployment),
         "The configuration key 'CasoCConsumer:AzureOpenAiDeployment' is required.")
     .Validate(
-        settings => !string.IsNullOrWhiteSpace(settings.OrderAgentId),
-        "The configuration key 'CasoCConsumer:OrderAgentId' is required.")
-    .Validate(
-        settings => !string.IsNullOrWhiteSpace(settings.PolicyAgentId),
-        "The configuration key 'CasoCConsumer:PolicyAgentId' is required.")
-    .Validate(
         settings => !string.IsNullOrWhiteSpace(settings.PlannerAgentId),
         "The configuration key 'CasoCConsumer:PlannerAgentId' is required.")
     .Validate(
@@ -58,7 +52,7 @@ builder.Services.AddSingleton(sp =>
 });
 builder.Services.AddSingleton<CasoCConsumerAgentRegistry>();
 builder.Services.AddSingleton<CasoCConsumerStartupValidator>();
-builder.Services.AddSingleton<CasoCConsumerOrchestrator>();
+builder.Services.AddSingleton<PlannerAgentConsumer>();
 builder.Services.AddHostedService<CasoCConsumerStartupValidationHostedService>();
 
 var app = builder.Build();
@@ -100,7 +94,7 @@ RouteGroupBuilder casoCConsumerApi = app.MapGroup("/api/casoc");
 casoCConsumerApi.MapPost("/ask", async (
     AskRequest request,
     HttpContext httpContext,
-    CasoCConsumerOrchestrator orchestrator,
+    PlannerAgentConsumer plannerAgentConsumer,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -118,20 +112,20 @@ casoCConsumerApi.MapPost("/ask", async (
         ["TraceId"] = traceId,
     });
 
-    logger.LogInformation("Request received. Path: {Path}", httpContext.Request.Path);
+    logger.LogInformation("PlannerAgent request received. Path: {Path}", httpContext.Request.Path);
 
     try
     {
-        CasoCConsumerOrchestrationResult result = await orchestrator.RunAsync(
+        string plannerAnswer = await plannerAgentConsumer.AskAsync(
             request.Prompt.Trim(),
             cancellationToken);
 
-        logger.LogInformation("Orchestration completed. Path: {Path}", httpContext.Request.Path);
-        return Results.Ok(new AskResponse(result.FinalAnswer, traceId));
+        logger.LogInformation("PlannerAgent request completed. Path: {Path}", httpContext.Request.Path);
+        return Results.Ok(new AskResponse(plannerAnswer, traceId));
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Orchestration failed. Path: {Path}", httpContext.Request.Path);
+        logger.LogError(ex, "PlannerAgent request failed. Path: {Path}", httpContext.Request.Path);
         throw;
     }
 });
@@ -139,7 +133,7 @@ casoCConsumerApi.MapPost("/ask", async (
 casoCConsumerApi.MapPost("/ask/debug", async (
     AskRequest request,
     HttpContext httpContext,
-    CasoCConsumerOrchestrator orchestrator,
+    PlannerAgentConsumer plannerAgentConsumer,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -157,24 +151,20 @@ casoCConsumerApi.MapPost("/ask/debug", async (
         ["TraceId"] = traceId,
     });
 
-    logger.LogInformation("Request received. Path: {Path}", httpContext.Request.Path);
+    logger.LogInformation("PlannerAgent debug request received. Path: {Path}", httpContext.Request.Path);
 
     try
     {
-        CasoCConsumerOrchestrationResult result = await orchestrator.RunAsync(
+        string plannerAnswer = await plannerAgentConsumer.AskAsync(
             request.Prompt.Trim(),
             cancellationToken);
 
-        logger.LogInformation("Orchestration completed. Path: {Path}", httpContext.Request.Path);
-        return Results.Ok(new AskDebugResponse(
-            result.OrderContext,
-            result.PolicyContext,
-            result.FinalAnswer,
-            traceId));
+        logger.LogInformation("PlannerAgent debug request completed. Path: {Path}", httpContext.Request.Path);
+        return Results.Ok(new AskDebugResponse(plannerAnswer, traceId));
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Orchestration failed. Path: {Path}", httpContext.Request.Path);
+        logger.LogError(ex, "PlannerAgent debug request failed. Path: {Path}", httpContext.Request.Path);
         throw;
     }
 });
@@ -186,20 +176,9 @@ casoCConsumerApi.MapGet("/health", (CasoCConsumerAgentRegistry agentRegistry) =>
     return Results.Ok(new HealthResponse(
         "ok",
         new AgentInfoResponse(
-            snapshot.OrderAgent.Id,
-            snapshot.OrderAgent.Name,
-            snapshot.OrderAgent.Version,
-            snapshot.OrderAgent.ValidationStatus),
-        new AgentInfoResponse(
-            snapshot.PolicyAgent.Id,
-            snapshot.PolicyAgent.Name,
-            snapshot.PolicyAgent.Version,
-            snapshot.PolicyAgent.ValidationStatus),
-        new AgentInfoResponse(
             snapshot.PlannerAgent.Id,
             snapshot.PlannerAgent.Name,
-            snapshot.PlannerAgent.Version,
-            snapshot.PlannerAgent.ValidationStatus)));
+            snapshot.PlannerAgent.Version)));
 });
 
 app.Run();

@@ -18,7 +18,7 @@ POST {{CasoCConsumer_HostAddress}}/api/casoc/ask/debug
 Content-Type: application/json
 
 {
-  "prompt": "Dame el estado de la orden ORD-000001 y dime si requiere accion."
+  "prompt": "Quiero el estado de la orden ORD-000001 y cualquier accion requerida."
 }
 
 ###
