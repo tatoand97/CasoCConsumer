@@ -26,8 +26,10 @@ internal sealed class CasoCConsumerStartupValidator
     {
         _logger.LogInformation("Startup validation started.");
 
-        await ValidateFoundryEndpointAsync(cancellationToken);
-        _logger.LogInformation("Foundry endpoint validated. Endpoint: {Endpoint}", _settings.AzureOpenAiEndpoint);
+        await ValidateFoundryProjectAccessAsync(cancellationToken);
+        _logger.LogInformation(
+            "Foundry project access validated. Endpoint: {Endpoint}",
+            _settings.AzureOpenAiEndpoint);
 
         ValidatedAgentInfo plannerAgent = await ValidateConfiguredAgentAsync(
             _settings.PlannerAgentId!,
@@ -100,7 +102,7 @@ internal sealed class CasoCConsumerStartupValidator
         }
     }
 
-    private async Task ValidateFoundryEndpointAsync(CancellationToken cancellationToken)
+    private async Task ValidateFoundryProjectAccessAsync(CancellationToken cancellationToken)
     {
         try
         {
