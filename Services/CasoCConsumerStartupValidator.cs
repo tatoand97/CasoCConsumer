@@ -59,8 +59,14 @@ internal sealed class CasoCConsumerStartupValidator
             return ValidatedAgentInfo.FromAgentVersion(version);
         }
 
+        AgentVersion? versionById = await TryGetAgentVersionByIdAsync(configuredAgentId, cancellationToken);
+        if (versionById is not null)
+        {
+            return ValidatedAgentInfo.FromAgentVersion(versionById);
+        }
+
         throw new InvalidOperationException(
-            $"The configured {agentLabel}AgentId '{configuredAgentId}' must be an explicit agent version reference in the format '<agent-name>:<version>'.");
+            $"The configured {agentLabel}AgentId '{configuredAgentId}' must resolve to an explicit agent version. Supported formats are an exact version id or '<agent-name>:<version>'.");
     }
 
     private async Task<AgentVersion> GetAgentVersionAsync(
@@ -109,6 +115,26 @@ internal sealed class CasoCConsumerStartupValidator
                 $"The configured AzureOpenAiEndpoint '{_settings.AzureOpenAiEndpoint}' is not accessible or is not a valid Foundry project endpoint.",
                 ex);
         }
+    }
+
+    private async Task<AgentVersion?> TryGetAgentVersionByIdAsync(
+        string configuredAgentId,
+        CancellationToken cancellationToken)
+    {
+        await foreach (AgentRecord agent in _projectClient.Agents.GetAgentsAsync(cancellationToken: cancellationToken))
+        {
+            await foreach (AgentVersion version in _projectClient.Agents.GetAgentVersionsAsync(
+                               agentName: agent.Name,
+                               cancellationToken: cancellationToken))
+            {
+                if (string.Equals(version.Id, configuredAgentId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return version;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static InvalidOperationException BuildAgentNotFoundException(

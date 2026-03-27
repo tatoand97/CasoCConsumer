@@ -1,6 +1,6 @@
 # CasoCConsumer API
 
-Consumer HTTP ASP.NET Core .NET 10 para el Caso C A2A.
+Consumer HTTP ASP.NET Core .NET 8 para el Caso C A2A.
 
 Este repo invoca solo a `PlannerAgent`. La delegacion hacia otros agentes ocurre dentro de `PlannerAgent` mediante A2A tool. `CasoCConsumer` no hace fan-out ni orquestacion multiagente en codigo.
 
@@ -33,7 +33,7 @@ El bootstrap y la reconciliacion de agentes viven en `CasoC`, no en este runtime
 Notas:
 
 - `AzureOpenAiEndpoint` debe ser HTTPS y contener `/api/projects/`
-- `PlannerAgentId` debe ser una referencia explicita de version con formato `<agent-name>:<version>`
+- `PlannerAgentId` debe resolver a una version explicita del planner, ya sea como version id exacto o como `<agent-name>:<version>`
 - `ResponsesTimeoutSeconds` y `ResponsesMaxBackoffSeconds` deben ser mayores que `0`
 
 ## Que hace
