@@ -1,6 +1,6 @@
 # CasoCConsumer API
 
-Consumer HTTP ASP.NET Core .NET 8 para el Caso C A2A.
+API consumer HTTP ASP.NET Core .NET 10 para el Caso C A2A.
 
 Este repo invoca solo a `PlannerAgent`. La delegacion hacia otros agentes ocurre dentro de `PlannerAgent` mediante A2A tool. `CasoCConsumer` no hace fan-out ni orquestacion multiagente en codigo.
 
@@ -8,6 +8,7 @@ Este repo invoca solo a `PlannerAgent`. La delegacion hacia otros agentes ocurre
 
 Antes de levantar este repo:
 
+- tener instalado el SDK de .NET 10
 - ejecutar el repo bootstrap `CasoC`
 - tener creado o reconciliado `PlannerAgent`
 - asegurar que `PlannerAgent` tenga sus conexiones A2A validas
